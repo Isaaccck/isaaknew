@@ -24,7 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const dots = document.querySelectorAll(".dot");
     let currentIndex = 0;
     let timer;
-    const interval = 3000; // 3 seconds
+    const interval = 5500; // 3 seconds
 
     function showImage(index) {
         // Remove active class from all
