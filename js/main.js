@@ -17,48 +17,146 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     /* -------------------------------------------
-       3. Image Carousel Logic
+       3. Image Carousel Logic (Swipe + Auto)
     ------------------------------------------- */
     const carousel = document.getElementById("carousel");
     const images = document.querySelectorAll(".carousel-img");
     const dots = document.querySelectorAll(".dot");
     let currentIndex = 0;
     let timer;
-    const interval = 5500; // 3 seconds
+    const interval = 3000;
+    let isAnimating = false;
 
-    function showImage(index) {
-        // Remove active class from all
-        images.forEach(img => img.classList.remove("active"));
-        dots.forEach(dot => dot.classList.remove("active"));
+    // Touch / pointer tracking
+    let startX = 0;
+    let startY = 0;
+    let isDragging = false;
+    const swipeThreshold = 40;
 
-        // Add active class to current
-        images[index].classList.add("active");
+    function showImage(index, direction) {
+        if (isAnimating) return;
+        isAnimating = true;
+
+        const prev = document.querySelector(".carousel-img.active");
+        const next = images[index];
+
+        // Update dots
+        dots.forEach(d => d.classList.remove("active"));
         dots[index].classList.add("active");
+
+        if (prev === next) {
+            isAnimating = false;
+            return;
+        }
+
+        // Determine animation classes based on swipe direction
+        // direction: 'left' means next image, 'right' means previous
+        const outClass = direction === 'left' ? 'swipe-left' : 'swipe-right';
+        const inClass = direction === 'left' ? 'swipe-in-left' : 'swipe-in-right';
+
+        // Prepare next image
+        next.style.opacity = '0';
+        next.style.transform = 'none';
+        next.classList.add('active');
+        next.classList.add(inClass);
+
+        // Animate out current
+        prev.classList.add(outClass);
+
+        // After animation finishes, clean up
+        const onEnd = () => {
+            prev.classList.remove('active', outClass);
+            prev.style.opacity = '';
+            prev.style.transform = '';
+            next.classList.remove(inClass);
+            next.style.opacity = '';
+            next.style.transform = '';
+            isAnimating = false;
+        };
+
+        setTimeout(onEnd, 460);
     }
 
     function nextImage() {
-        currentIndex = (currentIndex + 1) % images.length;
-        showImage(currentIndex);
+        const next = (currentIndex + 1) % images.length;
+        showImage(next, 'left');
+        currentIndex = next;
     }
 
-    // Start auto-slide
+    function prevImage() {
+        const prev = (currentIndex - 1 + images.length) % images.length;
+        showImage(prev, 'right');
+        currentIndex = prev;
+    }
+
+    // Auto-slide
     function startTimer() {
         timer = setInterval(nextImage, interval);
     }
 
-    // Reset timer on manual interaction
     function resetTimer() {
         clearInterval(timer);
         startTimer();
     }
 
-    // Click on the carousel to switch to next immediately
-    carousel.addEventListener("click", () => {
-        nextImage();
-        resetTimer();
+    // --- Touch events ---
+    carousel.addEventListener("touchstart", (e) => {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        isDragging = true;
+    }, { passive: true });
+
+    carousel.addEventListener("touchmove", (e) => {
+        // Intentionally left empty; we only care about start/end
+    }, { passive: true });
+
+    carousel.addEventListener("touchend", (e) => {
+        if (!isDragging) return;
+        isDragging = false;
+        const endX = e.changedTouches[0].clientX;
+        const endY = e.changedTouches[0].clientY;
+        const diffX = endX - startX;
+        const diffY = endY - startY;
+
+        // Only register horizontal swipe if it's more horizontal than vertical
+        if (Math.abs(diffX) > swipeThreshold && Math.abs(diffX) > Math.abs(diffY)) {
+            if (diffX < 0) {
+                nextImage(); // swipe left → next
+            } else {
+                prevImage(); // swipe right → previous
+            }
+            resetTimer();
+        }
     });
 
-    startTimer(); // Initialize
+    // --- Mouse drag events (desktop) ---
+    carousel.addEventListener("mousedown", (e) => {
+        startX = e.clientX;
+        startY = e.clientY;
+        isDragging = true;
+        e.preventDefault();
+    });
+
+    document.addEventListener("mouseup", (e) => {
+        if (!isDragging) return;
+        isDragging = false;
+        const diffX = e.clientX - startX;
+        const diffY = e.clientY - startY;
+
+        if (Math.abs(diffX) > swipeThreshold && Math.abs(diffX) > Math.abs(diffY)) {
+            if (diffX < 0) {
+                nextImage();
+            } else {
+                prevImage();
+            }
+            resetTimer();
+        }
+    });
+
+    // Prevent image drag ghost
+    carousel.addEventListener("dragstart", (e) => e.preventDefault());
+
+    startTimer();
 
     /* -------------------------------------------
        4. Scroll Animations (Intersection Observer)
@@ -69,7 +167,7 @@ document.addEventListener("DOMContentLoaded", () => {
         entries.forEach((entry) => {
             if (entry.isIntersecting) {
                 entry.target.classList.add('visible');
-                observer.unobserve(entry.target); // Animate only once
+                observer.unobserve(entry.target);
             }
         });
     }, {
@@ -89,13 +187,13 @@ document.addEventListener("DOMContentLoaded", () => {
     magneticBtns.forEach(btn => {
         btn.addEventListener('mousemove', (e) => {
             const rect = btn.getBoundingClientRect();
-            const x = e.clientX - rect.left; // x position within the element
-            const y = e.clientY - rect.top; // y position within the element
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
             
             const centerX = rect.width / 2;
             const centerY = rect.height / 2;
             
-            const deltaX = (x - centerX) / 8; // Adjust divisor for sensitivity
+            const deltaX = (x - centerX) / 8;
             const deltaY = (y - centerY) / 8;
 
             btn.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
